@@ -3,64 +3,68 @@
 #pragma once
 
 #include "ICamera.h"
-#include <math.h>
-#include <limits>
+#include "ray.h"
 
+// ================================ Perspective Camera Class ================================
 /**
  * @brief Perspective Camera class
+ * @ingroup moduleCamera
+ * @author Sergey G. Kosov, sergey.kosov@project-10.de
  */
 class CCameraPerspective : public ICamera
 {
 public:
-    /**
-     * @brief Constructor
-     * @param pos Camera origin (center of projection)
-     * @param dir Camera viewing direction
-     * @param up Up-vector
-     * @param angle (Vertical) full opening angle of the viewing frustum (in degrees)
-     * @param resolution The image resolution
-     */
-    CCameraPerspective(Vec3f pos, Vec3f dir, Vec3f up, float angle, Size resolution)
-    : ICamera(resolution)
-    , m_pos(pos)
-    , m_dir(dir)
-    , m_up(up)
-    {
-        m_zAxis = - dir;
-        m_yAxis = up;
-        m_xAxis = m_zAxis.cross(m_yAxis);
-        m_focus = tan(((angle * M_PI)/180)/2);
-        m_aspect = resolution.width / resolution.height;
+	/**
+	 * @brief Constructor
+	 * @param resolution The image resolution in pixels
+	 * @param pos Camera origin (center of projection)
+	 * @param dir Normalized camera viewing direction
+	 * @param up Normalized camera up-vector
+	 * @param angle (Vertical) full opening angle of the viewing frustum in degrees
+	 */
+	CCameraPerspective(Size resolution, const Vec3f& pos, const Vec3f& dir, const Vec3f& up, float angle)
+		: ICamera(resolution)
+		, m_pos(pos)
+		, m_dir(dir)
+		, m_up(up)
+	{
+        m_zAxis = dir;
+        m_xAxis = m_zAxis.cross(m_up);
+        m_yAxis = m_zAxis.cross(m_xAxis);
         
-    }
-    virtual ~CCameraPerspective(void) = default;
-    
-    virtual bool InitRay(float x, float y, Ray& r) override
-    {
-        if (x > resolution.width || y > resolution.height) {
-            return false;
-        }
-        r.t = std::numeric_limits<float>::infinity();
-        float Px = (2 * ((x + 0.5) / resolution.width) - 1) * m_focus * m_aspect;
-        float Py = (1 - 2 * ((y + 0.5) / resolution.height) * m_focus);
-        r.org = Vec3f(0, 0, 0);
-        r.dir = Vec3f(Px, Py, -1);
-        r.dir = normalize(r.dir);
-        return true;
-    }
-    
-    
+        m_xAxis = normalize(m_xAxis);
+        m_yAxis = normalize(m_yAxis);
+        m_zAxis = normalize(m_zAxis);
+        
+        m_focus = 1.0f / tanf(angle * Pif / 360);        // f = 1 / tg(angle / 2)
+	}
+	virtual ~CCameraPerspective(void) = default;
+
+	virtual void InitRay(Ray& ray, int x, int y) override
+	{
+        float dx = 0.5f;    // x-shift to the center of the pixel
+        float dy = 0.5f;    // y-shift to the center of the pixel
+        
+        // Screen space coordinates [-1, 1]
+        float sscx = 2 * (x + dx) / getResolution().width - 1;
+        float sscy = 2 * (y + dy) / getResolution().height - 1;
+        
+        ray.org = m_pos;
+        ray.dir = normalize(getAspectRatio() * sscx * m_xAxis + sscy * m_yAxis + m_focus * m_zAxis);
+        ray.t = std::numeric_limits<float>::infinity();
+	}
+
+
 private:
-    // input values
-    Vec3f m_pos;
-    Vec3f m_dir;
-    Vec3f m_up;
-    
-    // preprocessed values
-    float m_focus;
-    Vec3f m_xAxis;
-    Vec3f m_yAxis;
-    Vec3f m_zAxis;
-    float m_aspect;
+	// input values
+	Vec3f m_pos;			///< Camera origin (center of projection)
+	Vec3f m_dir;			///< Camera viewing direction
+	Vec3f m_up;				///< Camera up-vector
+	float m_focus;			///< The focal length
+
+	// preprocessed values
+	Vec3f m_xAxis;			///< Camera x-axis in WCS
+	Vec3f m_yAxis;			///< Camera y-axis in WCS
+	Vec3f m_zAxis;			///< Camera z-axis in WCS
 };
 

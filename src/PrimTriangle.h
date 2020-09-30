@@ -2,51 +2,67 @@
 // Written by Sergey Kosov in 2005 for Rendering Competition
 #pragma once
 
-#include "Prim.h"
-#include <math.h>
+#include "IPrim.h"
+#include "ray.h"
 
+// ================================ Triangle Primitive Class ================================
 /**
- * @brief Triangle Geaometrical Primitive class
+ * @brief Triangle Geometrical Primitive class
+ * @ingroup modulePrimitive
+ * @author Sergey G. Kosov, sergey.kosov@project-10.de
  */
-class CPrimTriangle : public CPrim
+class CPrimTriangle : public IPrim
 {
 public:
-    /**
-     * @brief Constructor
-     * @param a Position of the first vertex
-     * @param b Position of the second vertex
-     * @param c Position of the third vertex
-     */
-    CPrimTriangle(Vec3f a, Vec3f b, Vec3f c)
-    : CPrim()
-    , m_a(a)
-    , m_b(b)
-    , m_c(c)
-    {}
-    virtual ~CPrimTriangle(void) = default;
-    
-    virtual bool Intersect(Ray& ray) override
-    {
-        Vec3f plane_normal = normalize((m_b - m_a).cross((m_c - m_a))) ;
+	/**
+	 * @brief Constructor
+	 * @param a Position of the first vertex
+	 * @param b Position of the second vertex
+	 * @param c Position of the third vertex
+	 */
+	CPrimTriangle(const Vec3f& a, const Vec3f& b, const Vec3f& c)
+		: IPrim()
+		, m_a(a)
+		, m_b(b)
+		, m_c(c)
+  	{}
+	virtual ~CPrimTriangle(void) = default;
+	
+	virtual bool intersect(Ray& ray) const override
+	{
+        const Vec3f edge1 = m_b - m_a;
+        const Vec3f edge2 = m_c - m_a;
         
-        float intersect_pt = plane_normal.dot(m_a - ray.org) / ray.dir.dot(m_normal);
-        if ((((m_b - m_a).cross((intersect_pt - a))).dot(plane_normal)) < 0 ||
-            (((m_c - m_b).cross((intersect_pt - b))).dot(plane_normal)) < 0 ||
-            (((m_a - m_c).cross((intersect_pt - c))).dot(plane_normal)) < 0) {
-            return false; // else the triangle and ray do intersect
-        }
-        if (intersect_pt < Epsilon || intersect_pt >= ray.t) {
-            return false;
-        }
-        else {
-            ray.t = intersect_pt;
-            return true;
-            
-        }
+        const Vec3f pvec = ray.dir.cross(edge2);
         
+        const float det = edge1.dot(pvec);
+        if (fabs(det) < Epsilon) return false;
         
-    private:
-        Vec3f m_a;    ///< Position of the first vertex
-        Vec3f m_b;    ///< Position of the second vertex
-        Vec3f m_c;    ///< Position of the third vertex
-    };
+        const float inv_det = 1.0f / det;
+        
+        const Vec3f tvec = ray.org - m_a;
+        float lambda = tvec.dot(pvec);
+        lambda *= inv_det;
+        
+        if (lambda < 0.0f || lambda > 1.0f) return false;
+        
+        const Vec3f qvec = tvec.cross(edge1);
+        float mue = ray.dir.dot(qvec);
+        mue *= inv_det;
+        
+        if (mue < 0.0f || mue + lambda > 1.0f) return false;
+        
+        float f = edge2.dot(qvec);
+        f *= inv_det;
+        if (ray.t <= f || f <  Epsilon  ) return false;
+        
+        ray.t = f;
+        return true;
+	}
+
+	
+private:
+	Vec3f m_a;		///< Position of the first vertex
+	Vec3f m_b;		///< Position of the second vertex
+	Vec3f m_c;		///< Position of the third vertex
+};
